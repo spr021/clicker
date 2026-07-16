@@ -570,7 +570,11 @@ class Game {
   }
 }
 
-export default function LockpickGame() {
+type LockpickGameProps = {
+  userId?: string
+}
+
+export default function LockpickGame({ userId }: LockpickGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameRef = useRef<Game | null>(null)
   const animationRef = useRef<number | null>(null)
@@ -582,6 +586,7 @@ export default function LockpickGame() {
   const [speed, setSpeed] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [finalScore, setFinalScore] = useState(0)
+  const [isSavingScore, setIsSavingScore] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -605,9 +610,22 @@ export default function LockpickGame() {
         setTimeRemaining(Math.max(0, time))
         setSpeed(Math.floor(game.needle.velocity * 1000))
       },
-      (score) => {
+      async (score) => {
         setFinalScore(score)
         setGameOver(true)
+        
+        // Save score to database only if user is logged in
+        if (userId) {
+          setIsSavingScore(true)
+          try {
+            const { saveHighScore } = await import('@/app/actions/scores')
+            await saveHighScore(score)
+          } catch (error) {
+            console.error('Failed to save score:', error)
+          } finally {
+            setIsSavingScore(false)
+          }
+        }
       }
     )
     gameRef.current = game
@@ -685,6 +703,17 @@ export default function LockpickGame() {
               <div className="space-y-2">
                 <p className="text-6xl font-bold text-white">{finalScore}</p>
                 <p className="text-xl text-slate-300">Final Score</p>
+                {userId ? (
+                  isSavingScore ? (
+                    <p className="text-sm text-blue-400">Saving score...</p>
+                  ) : (
+                    <p className="text-sm text-green-400">Score saved to leaderboard!</p>
+                  )
+                ) : (
+                  <p className="text-sm text-yellow-400">
+                    🔒 <a href="/login" className="underline hover:text-yellow-300">Login</a> to save your score to the leaderboard
+                  </p>
+                )}
               </div>
               <button
                 onClick={restart}

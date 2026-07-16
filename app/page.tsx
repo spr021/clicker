@@ -1,70 +1,138 @@
 import { getSession } from '@/lib/session'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import Leaderboard from './game/Leaderboard'
+import { getLeaderboard } from './actions/scores'
+import { logout } from './actions/auth'
 
 export default async function Home() {
   const session = await getSession()
-
-  // If user is logged in, redirect to game
-  if (session) {
-    redirect('/game')
-  }
+  const { topTen, userEntry } = await getLeaderboard()
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <main className="w-full max-w-4xl space-y-8 px-4 py-16 text-center">
-        <div className="space-y-4">
-          <h1 className="text-6xl font-bold text-gray-900 dark:text-white md:text-7xl">
-            🎮 Clicker Game
-          </h1>
-          <p className="mx-auto max-w-2xl text-xl text-gray-600 dark:text-gray-400">
-            Welcome to the ultimate clicking experience! Create an account to
-            start playing and compete with others.
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="border-b border-slate-700 bg-slate-800/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <h1 className="text-2xl font-bold text-yellow-400">
+              🔓 Lockpick Master
+            </h1>
+            {session ? (
+              <p className="text-sm text-slate-400">
+                Welcome, <span className="font-semibold text-white">{session.displayName}</span>!
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400">
+                Master the art of lockpicking
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {session ? (
+              <>
+                <Link
+                  href="/game"
+                  className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow-md transition-colors hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                >
+                  Play Game
+                </Link>
+                <form action={logout}>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  >
+                    Logout
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-lg border-2 border-slate-600 bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:border-slate-500 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow-md transition-colors hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="w-full max-w-6xl mx-auto space-y-8 px-4 py-8">
+        {/* Welcome Section */}
+        <div className="text-center space-y-4 py-8">
+          <h2 className="text-4xl font-bold text-white md:text-5xl">
+            Welcome to Lockpick Master! 🔓
+          </h2>
+          <p className="mx-auto max-w-2xl text-lg text-slate-400">
+            Test your timing and precision. Click at the right moment to pick the lock and climb the leaderboard!
           </p>
+          {!session && (
+            <>
+              <p className="mx-auto max-w-xl text-sm text-slate-500">
+                Play as a guest or create an account to save your scores and compete on the leaderboard
+              </p>
+              <div className="flex flex-col items-center gap-3 pt-4 sm:flex-row sm:justify-center">
+                <Link
+                  href="/game"
+                  className="w-full rounded-lg bg-yellow-500 px-8 py-3 text-lg font-semibold text-slate-900 shadow-lg transition-all hover:bg-yellow-400 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-900 sm:w-auto"
+                >
+                  Play Now
+                </Link>
+                <Link
+                  href="/signup"
+                  className="w-full rounded-lg border-2 border-yellow-500 bg-transparent px-8 py-3 text-lg font-semibold text-yellow-400 shadow-md transition-all hover:bg-yellow-500/10 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-900 sm:w-auto"
+                >
+                  Sign Up to Save Scores
+                </Link>
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-          <Link
-            href="/signup"
-            className="w-full rounded-lg bg-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600 sm:w-auto"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/login"
-            className="w-full rounded-lg border-2 border-gray-300 bg-white px-8 py-4 text-lg font-semibold text-gray-900 shadow-md transition-all hover:border-gray-400 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:border-gray-500 sm:w-auto"
-          >
-            Login
-          </Link>
+        {/* Leaderboard */}
+        <div className="flex justify-center">
+          <Leaderboard 
+            topTen={topTen} 
+            userEntry={userEntry} 
+            currentUserId={session?.userId}
+          />
         </div>
 
-        <div className="mt-16 grid gap-8 sm:grid-cols-3">
-          <div className="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-            <div className="mb-4 text-4xl">👆</div>
-            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-              Simple & Fun
+        {/* Features */}
+        <div className="grid gap-6 sm:grid-cols-3 pt-8">
+          <div className="rounded-xl bg-slate-800 p-6 shadow-lg border border-slate-700">
+            <div className="mb-4 text-4xl">🎯</div>
+            <h3 className="mb-2 text-xl font-semibold text-white">
+              Perfect Timing
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Easy to play, hard to master. Start clicking and watch your score
-              grow!
+            <p className="text-slate-400">
+              Hit the zones at just the right moment. Chain combos for massive scores!
             </p>
           </div>
-          <div className="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+          <div className="rounded-xl bg-slate-800 p-6 shadow-lg border border-slate-700">
             <div className="mb-4 text-4xl">🏆</div>
-            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-              Track Progress
+            <h3 className="mb-2 text-xl font-semibold text-white">
+              Global Rankings
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Your account saves your progress and achievements automatically.
+            <p className="text-slate-400">
+              Compete with players worldwide and climb to the top of the leaderboard!
             </p>
           </div>
-          <div className="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+          <div className="rounded-xl bg-slate-800 p-6 shadow-lg border border-slate-700">
             <div className="mb-4 text-4xl">⚡</div>
-            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-              Fast & Secure
+            <h3 className="mb-2 text-xl font-semibold text-white">
+              Fast & Addictive
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Built with modern tech for a smooth, secure gaming experience.
+            <p className="text-slate-400">
+              Quick sessions, endless fun. Can you beat your high score?
             </p>
           </div>
         </div>
