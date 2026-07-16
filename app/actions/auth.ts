@@ -1,15 +1,14 @@
 'use server'
 
 import { SignupFormSchema, LoginFormSchema, FormState } from '@/lib/definitions'
-import { createSession, deleteSession } from '@/lib/session'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
-import bcrypt from 'bcryptjs'
+import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
 
 export async function signup(state: FormState, formData: FormData): Promise<FormState> {
   // 1. Validate form fields
   const validatedFields = SignupFormSchema.safeParse({
-    username: formData.get('username'),
+    email: formData.get('email'),
     password: formData.get('password'),
   })
 
@@ -20,39 +19,49 @@ export async function signup(state: FormState, formData: FormData): Promise<Form
     }
   }
 
-  const { username, password } = validatedFields.data
+  const { email, password } = validatedFields.data
 
-  // 2. Check if user already exists
-  const existingUser = await db.getUserByUsername(username)
-  if (existingUser) {
+  // 2. Create Supabase client
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  // 3. Sign up user with Supabase Auth
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      // Disable email confirmation for development
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/game`,
+    }
+  })
+
+  if (error) {
     return {
-      message: 'Username already exists. Please choose a different username.',
+      message: error.message || 'An error occurred while creating your account.',
     }
   }
 
-  // 3. Hash the user's password
-  const hashedPassword = await bcrypt.hash(password, 10)
-
-  // 4. Create user in database
-  const user = await db.createUser(username, hashedPassword)
-
-  if (!user) {
+  if (!data.user) {
     return {
       message: 'An error occurred while creating your account.',
     }
   }
 
-  // 5. Create user session
-  await createSession(user.id, user.username)
+  // Check if email confirmation is required
+  if (data.user && !data.session) {
+    return {
+      message: 'Please check your email to verify your account before logging in.',
+    }
+  }
 
-  // 6. Redirect user to game
+  // 4. Redirect user to game
   redirect('/game')
 }
 
 export async function login(state: FormState, formData: FormData): Promise<FormState> {
   // 1. Validate form fields
   const validatedFields = LoginFormSchema.safeParse({
-    username: formData.get('username'),
+    email: formData.get('email'),
     password: formData.get('password'),
   })
 
@@ -63,34 +72,44 @@ export async function login(state: FormState, formData: FormData): Promise<FormS
     }
   }
 
-  const { username, password } = validatedFields.data
+  const { email, password } = validatedFields.data
 
-  // 2. Query the database for the user
-  const user = await db.getUserByUsername(username)
+  // 2. Create Supabase client
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
-  if (!user) {
+  // 3. Sign in user with Supabase Auth
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    // Provide more detailed error messages
+    if (error.message.includes('Email not confirmed')) {
+      return {
+        message: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
+      }
+    }
     return {
-      message: 'Invalid username or password.',
+      message: error.message || 'Invalid email or password.',
     }
   }
 
-  // 3. Compare the password with the hashed password
-  const passwordMatch = await bcrypt.compare(password, user.password)
-
-  if (!passwordMatch) {
+  if (!data.session) {
     return {
-      message: 'Invalid username or password.',
+      message: 'Could not create session. Please try again.',
     }
   }
 
-  // 4. Create user session
-  await createSession(user.id, user.username)
-
-  // 5. Redirect user to game
+  // 4. Redirect user to game
   redirect('/game')
 }
 
 export async function logout() {
-  await deleteSession()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  
+  await supabase.auth.signOut()
   redirect('/login')
 }

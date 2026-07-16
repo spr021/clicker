@@ -23,22 +23,22 @@ export default function SignupPage() {
           <div className="space-y-4">
             <div>
               <label
-                htmlFor="username"
+                htmlFor="email"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Username
+                Email
               </label>
               <input
-                id="username"
-                name="username"
-                type="text"
+                id="email"
+                name="email"
+                type="email"
                 required
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Choose a username"
+                placeholder="Enter your email"
               />
-              {state?.errors?.username && (
+              {state?.errors?.email && (
                 <div className="mt-1 space-y-1">
-                  {state.errors.username.map((error) => (
+                  {state.errors.email.map((error) => (
                     <p key={error} className="text-sm text-red-600 dark:text-red-400">
                       {error}
                     </p>
