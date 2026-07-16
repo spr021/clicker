@@ -21,15 +21,29 @@ export async function signup(state: FormState, formData: FormData): Promise<Form
 
   const { email, password } = validatedFields.data
 
-  // 2. Create Supabase client
+  // 2. Generate display name from email
+  // Extract the part before @ and clean it up
+  const emailPrefix = email.split('@')[0]
+  // Remove dots, hyphens and make it more readable
+  const displayName = emailPrefix
+    .replace(/[._-]/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+
+  // 3. Create Supabase client
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
-  // 3. Sign up user with Supabase Auth
+  // 4. Sign up user with Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      // Save display name in user metadata
+      data: {
+        display_name: displayName,
+      },
       // Disable email confirmation for development
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/game`,
     }
@@ -54,7 +68,7 @@ export async function signup(state: FormState, formData: FormData): Promise<Form
     }
   }
 
-  // 4. Redirect user to game
+  // 5. Redirect user to game
   redirect('/game')
 }
 

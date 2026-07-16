@@ -28,10 +28,12 @@ export type FormState = {
 export type SessionPayload = {
   userId: string
   email: string
+  displayName: string
   expiresAt: Date
 }
 
 export type User = {
   id: string
   email: string
+  displayName: string
 }

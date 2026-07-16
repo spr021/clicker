@@ -16,6 +16,7 @@ export async function getSession() {
   return {
     userId: user.id,
     email: user.email || '',
+    displayName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // For compatibility
   }
 }
@@ -33,5 +34,6 @@ export async function getUser(): Promise<User | null> {
   return {
     id: user.id,
     email: user.email || '',
+    displayName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
   }
 }

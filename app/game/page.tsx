@@ -21,7 +21,7 @@ export default async function GamePage() {
               🔓 Lockpick Master
             </h1>
             <p className="text-sm text-slate-400">
-              Welcome, <span className="font-semibold text-white">{session.email}</span>!
+              Welcome, <span className="font-semibold text-white">{session.displayName}</span>!
             </p>
           </div>
           <form action={logout}>
