@@ -37,7 +37,6 @@ export default function Leaderboard({ topTen, userEntry, currentUserId }: Leader
                       {entry.display_name}
                       {isCurrentUser && <span className="ml-2 text-xs">(You)</span>}
                     </p>
-                    <p className="text-xs text-slate-400">{entry.email}</p>
                   </div>
                 </div>
                 <div className="text-right">

@@ -120,6 +120,31 @@ export async function login(state: FormState, formData: FormData): Promise<FormS
   redirect('/game')
 }
 
+export async function signInWithGoogle() {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  })
+
+  if (error) {
+    console.error('Error signing in with Google:', error)
+    return
+  }
+
+  if (data.url) {
+    redirect(data.url)
+  }
+}
+
 export async function logout() {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)

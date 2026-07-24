@@ -69,16 +69,13 @@ export default async function Home() {
         {/* Welcome Section */}
         <div className="text-center space-y-4 py-8">
           <h2 className="text-4xl font-bold text-white md:text-5xl">
-            Welcome to Lockpick Master! 🔓
+            Lockpick Master! 🔓
           </h2>
           <p className="mx-auto max-w-2xl text-lg text-slate-400">
-            Test your timing and precision. Click at the right moment to pick the lock and climb the leaderboard!
+            Test your timing and precision. Click at the right moment to pick the lock!
           </p>
           {!session && (
             <>
-              <p className="mx-auto max-w-xl text-sm text-slate-500">
-                Play as a guest or create an account to save your scores and compete on the leaderboard
-              </p>
               <div className="flex flex-col items-center gap-3 pt-4 sm:flex-row sm:justify-center">
                 <Link
                   href="/game"

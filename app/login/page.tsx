@@ -3,6 +3,7 @@
 import { login } from '@/app/actions/auth'
 import { useActionState } from 'react'
 import Link from 'next/link'
+import { GoogleSignInButton } from '@/app/components/GoogleSignInButton'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
@@ -81,19 +82,32 @@ export default function LoginPage() {
           >
             {pending ? 'Logging in...' : 'Login'}
           </button>
-
-          <div className="text-center text-sm">
-            <span className="text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
-            </span>
-            <Link
-              href="/signup"
-              className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-            >
-              Sign up
-            </Link>
-          </div>
         </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-white px-4 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              Or continue with
+            </span>
+          </div>
+        </div>
+
+        <GoogleSignInButton mode="login" />
+
+        <div className="text-center text-sm">
+          <span className="text-gray-600 dark:text-gray-400">
+            Don&apos;t have an account?{' '}
+          </span>
+          <Link
+            href="/signup"
+            className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+          >
+            Sign up
+          </Link>
+        </div>
       </div>
     </div>
   )
