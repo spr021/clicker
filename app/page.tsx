@@ -94,8 +94,14 @@ export default async function Home() {
           )}
         </div>
 
-        {/* Leaderboard */}
-        <div className="flex justify-center">
+        {/* Leaderboard Preview */}
+        <div className="flex flex-col items-center gap-4">
+          <Link
+            href="/leaderboard"
+            className="rounded-lg bg-yellow-500 px-6 py-2 text-sm font-semibold text-slate-900 shadow-md transition-colors hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            View Full Leaderboard
+          </Link>
           <Leaderboard 
             topTen={topTen} 
             userEntry={userEntry} 

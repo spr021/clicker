@@ -34,7 +34,7 @@ export default async function GamePage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/"
+              href="/leaderboard"
               className="rounded-lg border-2 border-slate-600 bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:border-slate-500 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
             >
               Leaderboard
