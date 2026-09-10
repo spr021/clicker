@@ -5,14 +5,8 @@
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://hnbmkrpgegymoidveays.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_uWXyARaIOQxd5rCKirutVw_3JgjaFrx"
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_uWXyARaIOQxd5rCKirutVw_3JgjaFrx"
   },
-  "builds": [
-    {
-      "src": "next.config.ts",
-      "use": "@vercel/next"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -50,11 +44,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/**": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  ]
 }
