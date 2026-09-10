@@ -8,71 +8,71 @@ type LeaderboardProps = {
 
 export default function Leaderboard({ topTen, userEntry, currentUserId }: LeaderboardProps) {
   return (
-    <div className="w-full max-w-2xl rounded-lg bg-slate-800 p-6 shadow-lg">
-      <h3 className="mb-4 text-2xl font-bold text-yellow-400">🏆 Leaderboard</h3>
-      
+    <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      <div className="mb-4 flex items-baseline justify-between gap-4">
+        <h3 className="text-lg font-semibold tracking-tight">Leaderboard</h3>
+        <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Top 10</p>
+      </div>
+
       {topTen.length === 0 ? (
-        <p className="text-center text-slate-400">No scores yet. Be the first!</p>
+        <p className="py-4 text-center text-sm text-muted">No scores yet. Be the first.</p>
       ) : (
         <div className="space-y-2">
           {topTen.map((entry, index) => {
             const isCurrentUser = currentUserId === entry.user_id
-            const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
-            
+
             return (
               <div
                 key={entry.id}
-                className={`flex items-center justify-between rounded-lg p-3 transition-colors ${
+                className={`flex items-center justify-between rounded-xl p-3 transition-colors ${
                   isCurrentUser
-                    ? 'bg-yellow-500/20 ring-2 ring-yellow-500'
-                    : 'bg-slate-700/50 hover:bg-slate-700'
+                    ? 'border border-accent/60 bg-accent/10'
+                    : 'border border-transparent hover:bg-foreground/5'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl font-bold text-slate-300 w-8">
-                    {rankEmoji}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-8 shrink-0 text-base font-semibold tabular-nums text-muted">
+                    {String(index + 1).padStart(2, '0')}
                   </span>
-                  <div>
-                    <p className={`font-semibold ${isCurrentUser ? 'text-yellow-400' : 'text-white'}`}>
-                      {entry.display_name}
-                      {isCurrentUser && <span className="ml-2 text-xs">(You)</span>}
-                    </p>
-                  </div>
+                  <p className="truncate text-sm font-medium">
+                    {entry.display_name}
+                    {isCurrentUser && <span className="ml-2 text-xs font-medium text-muted">(You)</span>}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-yellow-400">{entry.score}</p>
-                  <p className="text-xs text-slate-400">
+                <div className="shrink-0 text-right">
+                  <p className="text-xl font-semibold tabular-nums">{entry.score}</p>
+                  <p className="text-xs text-muted">
                     {new Date(entry.created_at).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             )
           })}
-          
+
           {/* Show user's entry if they're not in top 10 */}
           {userEntry && userEntry.rank > 10 && (
             <>
-              <div className="my-3 border-t border-slate-600 pt-3">
-                <p className="text-center text-xs text-slate-400 mb-2">Your Rank</p>
+              <div className="my-3 border-t border-border pt-3">
+                <p className="mb-2 text-center text-xs font-medium tracking-[0.18em] text-muted uppercase">Your Rank</p>
               </div>
               <div
-                className="flex items-center justify-between rounded-lg bg-yellow-500/20 p-3 ring-2 ring-yellow-500"
+                className="flex items-center justify-between rounded-xl border border-accent/60 bg-accent/10 p-3"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl font-bold text-slate-300 w-8">
-                    {userEntry.rank}.
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-8 shrink-0 text-base font-semibold tabular-nums text-muted">
+                    {userEntry.rank}
                   </span>
-                  <div>
-                    <p className="font-semibold text-yellow-400">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
                       {userEntry.display_name}
-                      <span className="ml-2 text-xs">(You)</span>
+                      <span className="ml-2 text-xs font-medium text-muted">(You)</span>
                     </p>
-                    <p className="text-xs text-slate-400">{userEntry.email}</p>
+                    <p className="truncate text-xs text-muted">{userEntry.email}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-yellow-400">{userEntry.score}</p>
-                  <p className="text-xs text-slate-400">
+                <div className="shrink-0 text-right">
+                  <p className="text-xl font-semibold tabular-nums">{userEntry.score}</p>
+                  <p className="text-xs text-muted">
                     {new Date(userEntry.created_at).toLocaleDateString()}
                   </p>
                 </div>

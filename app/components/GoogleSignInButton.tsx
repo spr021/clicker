@@ -11,7 +11,7 @@ export function GoogleSignInButton({ mode }: { mode: 'login' | 'signup' }) {
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className="flex w-full items-center justify-center gap-3 rounded-lg border-2 border-gray-300 bg-white px-4 py-3 font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+      className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium shadow-sm transition-colors hover:bg-foreground/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
     >
       <svg className="h-5 w-5" viewBox="0 0 24 24">
         <path
