@@ -3,11 +3,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #f4f2ec;
+  --border: #e2ddd1;
+  --muted: #6f6a5e;
+  --accent: #a97e2f;
+  --accent-foreground: #211a08;
+  --game-backdrop: #e9e6dd;
+  --game-panel: #f7f5ef;
+  --game-edge: #c9c3b4;
+  --game-tick: #8a8474;
+  --game-target: #a97e2f;
+  --game-bonus: #2f6f76;
+  --game-needle: #2b2620;
+  --game-danger: #a43d36;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,11 +34,24 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #131518;
+    --border: #262d35;
+    --muted: #9aa3ad;
+    --accent: #d3ab55;
+    --accent-foreground: #211a08;
+    --game-backdrop: #08090b;
+    --game-panel: #12161b;
+    --game-edge: #2b3440;
+    --game-tick: #5b6a7a;
+    --game-target: #d3ab55;
+    --game-bonus: #7fb4c7;
+    --game-needle: #e8edf2;
+    --game-danger: #d3655f;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }

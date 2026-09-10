@@ -36,6 +36,10 @@ class Zone {
     return this.endAngle - this.startAngle
   }
 
+  getLifeRatio(): number {
+    return Math.max(0, Math.min(1, 1 - this.age / this.maxAge))
+  }
+
   update(deltaTime: number): boolean {
     this.age += deltaTime
     const lifeRatio = 1 - (this.age / this.maxAge)
@@ -86,6 +90,69 @@ class Particle {
     this.life -= 1 / this.maxLife
     this.vy += 0.1 // gravity
     return this.life > 0
+  }
+}
+
+/**
+ * Presentation palette - Resolved from theme tokens so the instrument
+ * follows the application theme instead of using fixed game colors.
+ */
+type GamePalette = {
+  backdrop: string
+  panel: string
+  edge: string
+  tick: string
+  target: string
+  bonus: string
+  needle: string
+  danger: string
+  text: string
+  muted: string
+}
+
+function themeColor(name: string, fallback: string): string {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+function withAlpha(color: string, alpha: number): string {
+  const normalized = color.trim()
+  const rgbaMatch = normalized.match(/^rgba?\(([^)]+)\)$/)
+  if (rgbaMatch) {
+    const parts = rgbaMatch[1].split(',').map((part) => part.trim())
+    if (parts.length === 3 || parts.length === 4) {
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`
+    }
+    return normalized
+  }
+
+  const hexMatch = normalized.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+  if (!hexMatch) return normalized
+
+  let hex = hexMatch[1]
+  if (hex.length === 3) {
+    hex = hex.split('').map((part) => part + part).join('')
+  }
+
+  const red = parseInt(hex.slice(0, 2), 16)
+  const green = parseInt(hex.slice(2, 4), 16)
+  const blue = parseInt(hex.slice(4, 6), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function getGamePalette(): GamePalette {
+  return {
+    backdrop: themeColor('--game-backdrop', '#08090b'),
+    panel: themeColor('--game-panel', '#12161b'),
+    edge: themeColor('--game-edge', '#2b3440'),
+    tick: themeColor('--game-tick', '#5b6a7a'),
+    target: themeColor('--game-target', '#d3ab55'),
+    bonus: themeColor('--game-bonus', '#7fb4c7'),
+    needle: themeColor('--game-needle', '#e8edf2'),
+    danger: themeColor('--game-danger', '#d3655f'),
+    text: themeColor('--foreground', '#ededed'),
+    muted: themeColor('--muted', '#9aa3ad'),
   }
 }
 
@@ -187,7 +254,10 @@ class Game {
   // Visual effects
   shakeIntensity: number
   slowMotion: number
-  
+  palette: GamePalette
+  typeface: string
+  trail: number[]
+
   // Callbacks
   onScoreUpdate: (score: number, combo: number, time: number) => void
   onGameOver: (score: number) => void
@@ -223,7 +293,10 @@ class Game {
     
     this.shakeIntensity = 0
     this.slowMotion = 1
-    
+    this.palette = getGamePalette()
+    this.typeface = getComputedStyle(document.body).fontFamily
+    this.trail = []
+
     this.onScoreUpdate = onScoreUpdate
     this.onGameOver = onGameOver
     
@@ -291,6 +364,7 @@ class Game {
     this.combo = 0
     this.needle.angle = 0
     this.needle.velocity = this.baseSpeed // Start with base rotation
+    this.trail = []
     this.baseSpeed = 0.003
     this.maxSpeed = 0.03
     this.minZoneSize = Math.PI / 8
@@ -346,7 +420,7 @@ class Game {
         this.combo++
         this.audio.bonus()
         this.slowMotion = 0.3
-        this.spawnParticles(30, '#3b82f6')
+        this.spawnParticles(30, this.palette.bonus)
         setTimeout(() => { this.slowMotion = 1 }, 300)
       } else {
         // Regular zone hit
@@ -354,7 +428,7 @@ class Game {
         this.score += points
         this.combo++
         this.audio.success()
-        this.spawnParticles(15, '#fbbf24')
+        this.spawnParticles(15, this.palette.target)
       }
       
       // Increase difficulty - slower progression
@@ -413,6 +487,11 @@ class Game {
     this.needle.velocity += (targetSpeed - this.needle.velocity) * easing
     
     this.needle.angle += this.needle.velocity * dt
+    const normalizedTrailAngle = ((this.needle.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
+    this.trail.push(normalizedTrailAngle)
+    if (this.trail.length > 22) {
+      this.trail.shift()
+    }
 
     // Only update game logic when playing
     if (this.gameState !== 'playing') return
@@ -455,158 +534,370 @@ class Game {
 
   draw() {
     const ctx = this.ctx
+    const palette = this.palette
     const width = this.canvas.width
     const height = this.canvas.height
     const centerX = width / 2
     const centerY = height / 2
-    const radius = Math.min(width, height) * 0.3
-    
-    // Apply shake
+    const dial = Math.min(width, height) * 0.34
+    const bezel = dial * 1.16
+    const ui = Math.max(0.72, Math.min(1.25, width / 620))
+
+    // Apply restrained shake feedback
     ctx.save()
-    if (this.shakeIntensity > 0) {
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    if (this.shakeIntensity > 0.25) {
       ctx.translate(
-        (Math.random() - 0.5) * this.shakeIntensity,
-        (Math.random() - 0.5) * this.shakeIntensity
+        (Math.random() - 0.5) * this.shakeIntensity * 0.25,
+        (Math.random() - 0.5) * this.shakeIntensity * 0.25
       )
     }
-    
-    // Clear canvas with dark background
-    ctx.fillStyle = '#0f172a'
+
+    // Quiet studio backdrop
+    ctx.fillStyle = palette.backdrop
     ctx.fillRect(0, 0, width, height)
-    
-    // Draw outer glow
-    const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.8, centerX, centerY, radius * 1.5)
-    gradient.addColorStop(0, 'rgba(251, 191, 36, 0.1)')
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
-    ctx.fillStyle = gradient
+
+    const ambient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, dial * 2.7)
+    ambient.addColorStop(0, withAlpha(palette.panel, 0.92))
+    ambient.addColorStop(0.62, withAlpha(palette.panel, 0.32))
+    ambient.addColorStop(1, withAlpha(palette.backdrop, 1))
+    ctx.fillStyle = ambient
     ctx.fillRect(0, 0, width, height)
-    
-    // Draw lock body
+
+    const vignette = ctx.createRadialGradient(centerX, centerY, dial * 0.8, centerX, centerY, dial * 2.7)
+    vignette.addColorStop(0, withAlpha(palette.edge, 0))
+    vignette.addColorStop(0.68, withAlpha(palette.edge, 0))
+    vignette.addColorStop(1, withAlpha(palette.edge, 0.26))
+    ctx.fillStyle = vignette
+    ctx.fillRect(0, 0, width, height)
+
+    // Fine machined rings
+    for (let ring = 0; ring < 4; ring++) {
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, dial * (1.28 + ring * 0.045), 0, Math.PI * 2)
+      ctx.strokeStyle = withAlpha(palette.edge, 0.16)
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    // Brushed metal bezel
+    const metal = ctx.createLinearGradient(centerX - bezel, centerY - bezel, centerX + bezel, centerY + bezel)
+    metal.addColorStop(0, palette.panel)
+    metal.addColorStop(0.45, palette.edge)
+    metal.addColorStop(0.55, palette.edge)
+    metal.addColorStop(1, palette.panel)
     ctx.beginPath()
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
-    ctx.fillStyle = '#1e293b'
-    ctx.fill()
-    ctx.strokeStyle = '#64748b'
-    ctx.lineWidth = 4
+    ctx.arc(centerX, centerY, bezel, 0, Math.PI * 2)
+    ctx.strokeStyle = metal
+    ctx.lineWidth = dial * 0.16
     ctx.stroke()
-    
-    // Draw inner circle
+
     ctx.beginPath()
-    ctx.arc(centerX, centerY, radius * 0.85, 0, Math.PI * 2)
-    ctx.fillStyle = '#0f172a'
-    ctx.fill()
-    ctx.strokeStyle = '#334155'
+    ctx.arc(centerX, centerY, bezel + dial * 0.08, 0, Math.PI * 2)
+    ctx.strokeStyle = withAlpha(palette.edge, 0.8)
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, bezel - dial * 0.08, 0, Math.PI * 2)
+    ctx.strokeStyle = withAlpha(palette.text, 0.18)
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Controlled specular highlight
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, bezel, Math.PI * 1.08, Math.PI * 1.42)
+    ctx.strokeStyle = withAlpha(palette.text, 0.22)
     ctx.lineWidth = 2
     ctx.stroke()
+
+    // Bezel fasteners
+    const screwRadius = dial * 0.038
+    for (let screw = 0; screw < 4; screw++) {
+      const screwAngle = Math.PI / 4 + screw * (Math.PI / 2)
+      const screwX = centerX + Math.cos(screwAngle) * bezel
+      const screwY = centerY + Math.sin(screwAngle) * bezel
+
+      ctx.beginPath()
+      ctx.arc(screwX, screwY, screwRadius, 0, Math.PI * 2)
+      ctx.fillStyle = palette.panel
+      ctx.fill()
+      ctx.strokeStyle = withAlpha(palette.edge, 0.9)
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      ctx.save()
+      ctx.translate(screwX, screwY)
+      ctx.rotate(screwAngle + Math.PI / 4)
+      ctx.fillStyle = withAlpha(palette.muted, 0.9)
+      ctx.fillRect(-screwRadius * 0.55, -1, screwRadius * 1.1, 2)
+      ctx.restore()
+    }
+
+    // Instrument face
+    const face = ctx.createRadialGradient(centerX - dial * 0.25, centerY - dial * 0.3, dial * 0.1, centerX, centerY, dial)
+    face.addColorStop(0, palette.panel)
+    face.addColorStop(1, palette.backdrop)
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, dial, 0, Math.PI * 2)
+    ctx.fillStyle = face
+    ctx.fill()
+    ctx.strokeStyle = withAlpha(palette.edge, 0.9)
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, dial * 0.97, 0, Math.PI * 2)
+    ctx.strokeStyle = withAlpha(palette.edge, 0.55)
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Precision tick ring
+    for (let tick = 0; tick < 72; tick++) {
+      const major = tick % 6 === 0
+      const tickAngle = (tick / 72) * Math.PI * 2
+      const innerTick = dial * (major ? 0.845 : 0.875)
+      const outerTick = dial * 0.905
+
+      ctx.beginPath()
+      ctx.moveTo(centerX + Math.cos(tickAngle) * innerTick, centerY + Math.sin(tickAngle) * innerTick)
+      ctx.lineTo(centerX + Math.cos(tickAngle) * outerTick, centerY + Math.sin(tickAngle) * outerTick)
+      ctx.strokeStyle = withAlpha(palette.tick, major ? 0.8 : 0.42)
+      ctx.lineWidth = major ? 2 : 1
+      ctx.stroke()
+    }
     
-    // Draw zones
+    // Calibrated target sectors
+    const innerSector = dial * 0.64
+    const outerSector = dial * 0.8
     this.zones.forEach(zone => {
       if (!zone.active) return
-      
+
+      const life = zone.getLifeRatio()
+      const pulse = 0.74 + 0.26 * Math.sin(Date.now() / 420)
+      const sectorColor = zone.isBonus ? palette.bonus : palette.target
+      const edgeAlpha = (0.24 + 0.58 * life) * pulse
+      const fillAlpha = 0.08 + 0.16 * life
+
       ctx.save()
       ctx.beginPath()
-      ctx.arc(centerX, centerY, radius * 0.85, zone.startAngle, zone.endAngle)
-      ctx.arc(centerX, centerY, radius * 0.7, zone.endAngle, zone.startAngle, true)
+      ctx.arc(centerX, centerY, outerSector, zone.startAngle, zone.endAngle)
+      ctx.arc(centerX, centerY, innerSector, zone.endAngle, zone.startAngle, true)
       ctx.closePath()
-      
+      ctx.fillStyle = withAlpha(sectorColor, fillAlpha)
+      ctx.fill()
+      ctx.strokeStyle = withAlpha(sectorColor, edgeAlpha)
+      ctx.lineWidth = Math.max(1.25, dial * 0.012)
+      ctx.stroke()
+
+      // Remaining-life hairline
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, outerSector + dial * 0.022, zone.startAngle, zone.endAngle)
+      ctx.strokeStyle = withAlpha(palette.muted, 0.18 + 0.22 * life)
+      ctx.lineWidth = 1
+      ctx.stroke()
+
       if (zone.isBonus) {
-        // Bonus zone - blue with glow
-        ctx.fillStyle = `rgba(59, 130, 246, ${0.6 * zone.glowIntensity})`
+        const midpoint = (zone.startAngle + zone.endAngle) / 2
+        const markerRadius = outerSector + dial * 0.055
+        const markerSize = dial * 0.018
+        const markerX = centerX + Math.cos(midpoint) * markerRadius
+        const markerY = centerY + Math.sin(midpoint) * markerRadius
+
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, innerSector + dial * 0.025, zone.startAngle, zone.endAngle)
+        ctx.strokeStyle = withAlpha(sectorColor, 0.35 + 0.35 * life)
+        ctx.lineWidth = 1
+        ctx.stroke()
+
+        ctx.beginPath()
+        ctx.moveTo(markerX, markerY - markerSize)
+        ctx.lineTo(markerX + markerSize, markerY)
+        ctx.lineTo(markerX, markerY + markerSize)
+        ctx.lineTo(markerX - markerSize, markerY)
+        ctx.closePath()
+        ctx.fillStyle = withAlpha(sectorColor, 0.35 + 0.55 * life)
         ctx.fill()
-        ctx.strokeStyle = `rgba(96, 165, 250, ${zone.glowIntensity})`
-        ctx.lineWidth = 3
-        ctx.stroke()
-        
-        // Extra glow
-        ctx.shadowBlur = 20
-        ctx.shadowColor = '#3b82f6'
-        ctx.stroke()
       } else {
-        // Success zone - gold with glow
-        ctx.fillStyle = `rgba(251, 191, 36, ${0.5 * zone.glowIntensity})`
-        ctx.fill()
-        ctx.strokeStyle = `rgba(251, 191, 36, ${zone.glowIntensity})`
-        ctx.lineWidth = 3
-        ctx.stroke()
-        
-        // Extra glow
-        ctx.shadowBlur = 15
-        ctx.shadowColor = '#fbbf24'
-        ctx.stroke()
+        for (const endpoint of [zone.startAngle, zone.endAngle]) {
+          ctx.beginPath()
+          ctx.moveTo(centerX + Math.cos(endpoint) * innerSector, centerY + Math.sin(endpoint) * innerSector)
+          ctx.lineTo(centerX + Math.cos(endpoint) * (innerSector + dial * 0.025), centerY + Math.sin(endpoint) * (innerSector + dial * 0.025))
+          ctx.strokeStyle = withAlpha(sectorColor, edgeAlpha)
+          ctx.lineWidth = 2
+          ctx.stroke()
+        }
       }
-      
+
       ctx.restore()
     })
     
-    // Draw center circle
-    ctx.beginPath()
-    ctx.arc(centerX, centerY, radius * 0.15, 0, Math.PI * 2)
-    ctx.fillStyle = '#334155'
-    ctx.fill()
-    ctx.strokeStyle = '#64748b'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    
-    // Draw needle
-    ctx.save()
-    ctx.translate(centerX, centerY)
-    ctx.rotate(this.needle.angle)
-    
-    ctx.beginPath()
-    ctx.moveTo(0, 0)
-    ctx.lineTo(radius * 0.75, 0)
-    ctx.strokeStyle = '#ef4444'
-    ctx.lineWidth = 4
-    ctx.lineCap = 'round'
-    ctx.stroke()
-    
-    // Needle tip glow
-    ctx.beginPath()
-    ctx.arc(radius * 0.75, 0, 6, 0, Math.PI * 2)
-    ctx.fillStyle = '#dc2626'
-    ctx.fill()
-    ctx.shadowBlur = 10
-    ctx.shadowColor = '#ef4444'
-    ctx.fill()
-    
-    ctx.restore()
-    
-    // Draw particles
-    this.particles.forEach(p => {
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
-      ctx.fillStyle = p.color
-      ctx.globalAlpha = p.life
-      ctx.fill()
-      ctx.globalAlpha = 1
-    })
-    
-    // Draw start/gameover screen
-    if (this.gameState === 'start') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-      ctx.fillRect(0, 0, width, height)
-      
-      ctx.fillStyle = '#fbbf24'
-      ctx.font = 'bold 48px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('LOCKPICK', centerX, centerY - 60)
-      
-      ctx.fillStyle = '#94a3b8'
-      ctx.font = '18px sans-serif'
-      ctx.fillText('Needle rotates automatically', centerX, centerY - 10)
-      ctx.fillText('Hold Right Click: Double Speed', centerX, centerY + 20)
-      ctx.fillText('Left Click: Pick Lock', centerX, centerY + 50)
-      ctx.fillStyle = '#fbbf24'
-      ctx.font = 'bold 22px sans-serif'
-      ctx.fillText('Left Click to Start', centerX, centerY + 90)
-      
-      if (this.bestScore > 0) {
-        ctx.fillStyle = '#fbbf24'
-        ctx.font = 'bold 24px sans-serif'
-        ctx.fillText(`Best: ${this.bestScore}`, centerX, centerY + 120)
+    // Needle motion trail
+    if (this.trail.length > 1) {
+      for (let index = 0; index < this.trail.length; index++) {
+        const trailAlpha = (index / this.trail.length) * 0.16
+        const trailRadius = dial * 0.76
+        const trailX = centerX + Math.cos(this.trail[index]) * trailRadius
+        const trailY = centerY + Math.sin(this.trail[index]) * trailRadius
+
+        ctx.beginPath()
+        ctx.arc(trailX, trailY, Math.max(1, dial * 0.008), 0, Math.PI * 2)
+        ctx.fillStyle = withAlpha(palette.needle, trailAlpha)
+        ctx.fill()
       }
     }
+
+    // Precision probe
+    ctx.save()
+    ctx.shadowColor = withAlpha(palette.edge, 0.5)
+    ctx.shadowBlur = dial * 0.04
+    ctx.shadowOffsetY = dial * 0.01
+    ctx.translate(centerX, centerY)
+    ctx.rotate(this.needle.angle)
+
+    const shaftGradient = ctx.createLinearGradient(0, -dial * 0.02, 0, dial * 0.02)
+    shaftGradient.addColorStop(0, palette.edge)
+    shaftGradient.addColorStop(0.5, palette.needle)
+    shaftGradient.addColorStop(1, palette.edge)
+    ctx.beginPath()
+    ctx.moveTo(-dial * 0.18, -dial * 0.018)
+    ctx.lineTo(dial * 0.78, -dial * 0.006)
+    ctx.lineTo(dial * 0.78, dial * 0.006)
+    ctx.lineTo(-dial * 0.18, dial * 0.018)
+    ctx.closePath()
+    ctx.fillStyle = shaftGradient
+    ctx.fill()
+
+    ctx.fillStyle = withAlpha(palette.target, 0.92)
+    ctx.fillRect(-dial * 0.2, -dial * 0.035, dial * 0.1, dial * 0.07)
+    ctx.strokeStyle = withAlpha(palette.edge, 0.8)
+    ctx.lineWidth = 1
+    ctx.strokeRect(-dial * 0.2, -dial * 0.035, dial * 0.1, dial * 0.07)
+
+    ctx.beginPath()
+    ctx.moveTo(dial * 0.78, 0)
+    ctx.lineTo(dial * 0.88, 0)
+    ctx.strokeStyle = palette.danger
+    ctx.lineWidth = Math.max(2, dial * 0.014)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(dial * 0.88, 0, Math.max(1.5, dial * 0.012), 0, Math.PI * 2)
+    ctx.fillStyle = palette.danger
+    ctx.fill()
+
+    ctx.restore()
+
+    // Machined hub
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, dial * 0.15, 0, Math.PI * 2)
+    ctx.fillStyle = palette.panel
+    ctx.fill()
+    ctx.strokeStyle = withAlpha(palette.edge, 0.9)
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    const hub = ctx.createLinearGradient(centerX - dial * 0.1, centerY - dial * 0.1, centerX + dial * 0.1, centerY + dial * 0.1)
+    hub.addColorStop(0, palette.panel)
+    hub.addColorStop(1, palette.edge)
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, dial * 0.105, 0, Math.PI * 2)
+    ctx.fillStyle = hub
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, dial * 0.105, Math.PI * 1.1, Math.PI * 1.45)
+    ctx.strokeStyle = withAlpha(palette.text, 0.28)
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, Math.max(1.5, dial * 0.018), 0, Math.PI * 2)
+    ctx.fillStyle = palette.target
+    ctx.fill()
     
+    // Refined metallic sparks
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    this.particles.forEach(p => {
+      const sparkAlpha = Math.max(0, p.life) * 0.72
+      ctx.beginPath()
+      ctx.moveTo(p.x, p.y)
+      ctx.lineTo(p.x - p.vx * 2.2, p.y - p.vy * 2.2)
+      ctx.strokeStyle = withAlpha(p.color, sparkAlpha)
+      ctx.lineWidth = Math.max(1, p.size * 0.32)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, Math.max(0.5, p.size * 0.28 * p.life), 0, Math.PI * 2)
+      ctx.fillStyle = withAlpha(p.color, sparkAlpha)
+      ctx.fill()
+    })
+    ctx.restore()
+
+    // Instrument start panel
+    if (this.gameState === 'start') {
+      const panelWidth = width * 0.74
+      const panelHeight = height * 0.58
+      const panelX = centerX - panelWidth / 2
+      const panelY = centerY - panelHeight / 2
+      const corner = 14 * ui
+
+      ctx.fillStyle = withAlpha(palette.backdrop, 0.74)
+      ctx.fillRect(0, 0, width, height)
+
+      ctx.beginPath()
+      ctx.moveTo(panelX + corner, panelY)
+      ctx.lineTo(panelX + panelWidth - corner, panelY)
+      ctx.arcTo(panelX + panelWidth, panelY, panelX + panelWidth, panelY + corner, corner)
+      ctx.lineTo(panelX + panelWidth, panelY + panelHeight - corner)
+      ctx.arcTo(panelX + panelWidth, panelY + panelHeight, panelX + panelWidth - corner, panelY + panelHeight, corner)
+      ctx.lineTo(panelX + corner, panelY + panelHeight)
+      ctx.arcTo(panelX, panelY + panelHeight, panelX, panelY + panelHeight - corner, corner)
+      ctx.lineTo(panelX, panelY + corner)
+      ctx.arcTo(panelX, panelY, panelX + corner, panelY, corner)
+      ctx.closePath()
+      ctx.fillStyle = withAlpha(palette.panel, 0.96)
+      ctx.fill()
+      ctx.strokeStyle = withAlpha(palette.edge, 0.85)
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = palette.text
+      ctx.font = `600 ${30 * ui}px ${this.typeface}`
+      ctx.fillText('PRECISION LOCKPICK', centerX, panelY + panelHeight * 0.24)
+
+      ctx.fillStyle = palette.muted
+      ctx.font = `500 ${12 * ui}px ${this.typeface}`
+      ctx.fillText('CALIBRATED DIAL INSTRUMENT', centerX, panelY + panelHeight * 0.34)
+
+      ctx.strokeStyle = withAlpha(palette.target, 0.75)
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(centerX - panelWidth * 0.18, panelY + panelHeight * 0.41)
+      ctx.lineTo(centerX + panelWidth * 0.18, panelY + panelHeight * 0.41)
+      ctx.stroke()
+
+      ctx.fillStyle = palette.text
+      ctx.font = `500 ${13.5 * ui}px ${this.typeface}`
+      ctx.fillText('Needle rotates automatically', centerX, panelY + panelHeight * 0.51)
+      ctx.fillText('Hold right click to accelerate', centerX, panelY + panelHeight * 0.60)
+      ctx.fillText('Left click inside a marked sector', centerX, panelY + panelHeight * 0.69)
+
+      ctx.fillStyle = palette.target
+      ctx.font = `600 ${14 * ui}px ${this.typeface}`
+      ctx.fillText('Select the dial to begin', centerX, panelY + panelHeight * 0.81)
+
+      if (this.bestScore > 0) {
+        ctx.fillStyle = palette.muted
+        ctx.font = `500 ${12 * ui}px ${this.typeface}`
+        ctx.fillText(`BEST ${this.bestScore}`, centerX, panelY + panelHeight * 0.90)
+      }
+    }
+
     ctx.restore()
   }
 }
@@ -702,82 +993,85 @@ export default function LockpickGame({ userId }: LockpickGameProps) {
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {/* HUD */}
-      <div className="grid w-full max-w-2xl grid-cols-4 gap-4">
-        <div className="rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 p-4 text-center shadow-lg">
-          <div className="text-3xl font-bold text-white">{score}</div>
-          <div className="text-sm text-yellow-100">Score</div>
+      {/* Instrument HUD */}
+      <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface p-4 text-center shadow-sm">
+          <div className="text-3xl font-semibold tabular-nums text-foreground">{score}</div>
+          <div className="mt-1 text-xs font-medium tracking-[0.18em] text-muted uppercase">Score</div>
         </div>
-        <div className={`rounded-lg p-4 text-center shadow-lg transition-all ${
-          timeRemaining <= 10 
-            ? 'animate-pulse bg-gradient-to-br from-red-500 to-red-600' 
-            : 'bg-gradient-to-br from-blue-500 to-blue-600'
+        <div className={`rounded-xl border bg-surface p-4 text-center shadow-sm transition-colors ${
+          timeRemaining <= 10 ? 'border-accent/70' : 'border-border'
         }`}>
-          <div className="text-3xl font-bold text-white">{Math.ceil(timeRemaining)}</div>
-          <div className="text-sm text-blue-100">Time</div>
+          <div className="text-3xl font-semibold tabular-nums text-foreground">{Math.ceil(timeRemaining)}</div>
+          <div className="mt-1 text-xs font-medium tracking-[0.18em] text-muted uppercase">Time</div>
         </div>
-        <div className="rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 p-4 text-center shadow-lg">
-          <div className="text-3xl font-bold text-white">x{combo}</div>
-          <div className="text-sm text-purple-100">Combo</div>
+        <div className="rounded-xl border border-border bg-surface p-4 text-center shadow-sm">
+          <div className="text-3xl font-semibold tabular-nums text-foreground">×{combo}</div>
+          <div className="mt-1 text-xs font-medium tracking-[0.18em] text-muted uppercase">Combo</div>
         </div>
-        <div className="rounded-lg bg-gradient-to-br from-green-500 to-green-600 p-4 text-center shadow-lg">
-          <div className="text-3xl font-bold text-white">
-            {speed}
+        <div className="rounded-xl border border-border bg-surface p-4 text-center shadow-sm">
+          <div className="text-3xl font-semibold tabular-nums text-foreground">
+            {Math.abs(speed)}
           </div>
-          <div className="text-sm text-green-100">Speed</div>
+          <div className="mt-1 text-xs font-medium tracking-[0.18em] text-muted uppercase">Tempo</div>
         </div>
       </div>
 
-      {/* Game Canvas */}
+      {/* Instrument console */}
       <div className="relative">
         <canvas
           ref={canvasRef}
-          className="rounded-2xl shadow-2xl ring-4 ring-slate-700"
+          className="rounded-2xl border border-border bg-surface shadow-xl"
           style={{ touchAction: 'none' }}
         />
-        
-        {/* Game Over Modal */}
+
+        {/* Session summary */}
         {gameOver && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/80 backdrop-blur-sm">
-            <div className="space-y-6 rounded-xl bg-slate-800 p-8 text-center">
-              <h2 className="text-4xl font-bold text-yellow-400">Game Over!</h2>
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/80 backdrop-blur-sm">
+            <div className="w-[min(90%,26rem)] space-y-6 rounded-2xl border border-border bg-surface p-8 text-center shadow-xl">
+              <div className="space-y-1">
+                <p className="text-xs font-medium tracking-[0.22em] text-muted uppercase">Session complete</p>
+                <h2 className="text-3xl font-semibold text-foreground">Results</h2>
+              </div>
               <div className="space-y-2">
-                <p className="text-6xl font-bold text-white">{finalScore}</p>
-                <p className="text-xl text-slate-300">Final Score</p>
+                <p className="text-6xl font-semibold tabular-nums text-foreground">{finalScore}</p>
+                <p className="text-sm text-muted">Final score</p>
                 {userId ? (
                   isSavingScore ? (
-                    <p className="text-sm text-blue-400">Saving score...</p>
+                    <p className="text-sm text-muted">Saving score…</p>
                   ) : (
-                    <p className="text-sm text-green-400">Score saved to leaderboard!</p>
+                    <p className="text-sm text-muted">Score saved to leaderboard</p>
                   )
                 ) : (
-                  <p className="text-sm text-yellow-400">
-                    🔒 <a href="/login" className="underline hover:text-yellow-300">Login</a> to save your score to the leaderboard
+                  <p className="text-sm text-muted">
+                    <a href="/login" className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">Log in</a> to save your score
                   </p>
                 )}
               </div>
               <button
                 onClick={restart}
-                className="rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 px-8 py-3 text-lg font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+                className="w-full rounded-xl bg-foreground px-8 py-3 text-base font-semibold text-background shadow-sm transition-transform hover:-translate-y-0.5 active:translate-y-0"
               >
-                Play Again
+                Start new session
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Instructions */}
-      <div className="w-full max-w-2xl rounded-lg bg-slate-800 p-6 text-slate-300 shadow-lg">
-        <h3 className="mb-3 text-xl font-bold text-white">How to Play</h3>
-        <ul className="space-y-2 text-sm">
-          <li>🔄 <strong>Auto Rotation:</strong> Needle rotates slowly by default</li>
-          <li>🖱️ <strong>Right Click/2 Fingers:</strong> Double the rotation speed</li>
-          <li>🎯 <strong>Left Click/Tap:</strong> Attempt to pick the lock</li>
-          <li>🟡 <strong>Gold Zones:</strong> Success zones - hit them for points</li>
-          <li>🔵 <strong>Blue Zones:</strong> Bonus zones - extra time and points!</li>
-          <li>💥 <strong>Combo:</strong> Chain successful hits for multipliers</li>
-          <li>⚡ <strong>Difficulty:</strong> Speed increases gradually with score</li>
+      {/* Operating guide */}
+      <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <div className="mb-4 flex items-baseline justify-between gap-4">
+          <h3 className="text-lg font-semibold text-foreground">Operating guide</h3>
+          <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Precision instrument</p>
+        </div>
+        <ul className="grid gap-3 text-sm text-muted sm:grid-cols-2">
+          <li><strong className="font-semibold text-foreground">Rotation:</strong> The probe advances automatically.</li>
+          <li><strong className="font-semibold text-foreground">Accelerate:</strong> Hold right click or two fingers.</li>
+          <li><strong className="font-semibold text-foreground">Attempt:</strong> Left click inside a marked sector.</li>
+          <li><strong className="font-semibold text-foreground">Bonus sectors:</strong> Award additional time and points.</li>
+          <li><strong className="font-semibold text-foreground">Combo:</strong> Consecutive successes increase scoring.</li>
+          <li><strong className="font-semibold text-foreground">Tempo:</strong> Successful attempts gradually raise speed.</li>
         </ul>
       </div>
     </div>
