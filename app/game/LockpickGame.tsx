@@ -376,13 +376,9 @@ class Game {
     // Update needle physics - always rotates, holding right-click doubles speed
     const targetSpeed = this.isAccelerating ? this.baseSpeed * 2 : this.baseSpeed
     
-    // Smoothly transition to target speed
-    if (Math.abs(this.needle.velocity - targetSpeed) > 0.0001) {
-      const diff = targetSpeed - this.needle.velocity
-      this.needle.velocity += diff * 0.1 * (dt / 16)
-    } else {
-      this.needle.velocity = targetSpeed
-    }
+    // Smoothly transition to target speed with exponential easing for fluid motion
+    const easing = 0.15 * (dt / 16)
+    this.needle.velocity += (targetSpeed - this.needle.velocity) * easing
     
     this.needle.angle += this.needle.velocity * dt
 
