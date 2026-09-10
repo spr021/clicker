@@ -317,7 +317,7 @@ class Game {
     
     const zoneSize = Math.max(
       this.minZoneSize * (1 - this.score / 3000),
-      Math.PI / 12
+      Math.PI / 6
     )
     const startAngle = Math.random() * (Math.PI * 2 - zoneSize)
     const isBonus = Math.random() > 0.65
@@ -365,8 +365,11 @@ class Game {
       
       this.onScoreUpdate(this.score, this.combo, this.timeRemaining)
     } else {
-      // Miss
+      // Miss - reset speed to base while preserving rotation direction
+      const direction = this.baseSpeed >= 0 ? 1 : -1
       this.combo = 0
+      this.baseSpeed = 0.0008 * direction
+      this.needle.velocity = 0.0008 * direction
       this.timeRemaining -= 1
       this.shakeIntensity = 10
       this.audio.fail()
