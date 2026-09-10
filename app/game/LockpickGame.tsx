@@ -12,12 +12,19 @@ class Zone {
   active: boolean
   glowIntensity: number
 
+  initialSize: number
+  age: number
+  maxAge: number
+
   constructor(startAngle: number, endAngle: number, isBonus: boolean = false) {
     this.startAngle = startAngle
     this.endAngle = endAngle
     this.isBonus = isBonus
     this.active = true
     this.glowIntensity = 0
+    this.initialSize = endAngle - startAngle
+    this.age = 0
+    this.maxAge = 5000
   }
 
   contains(angle: number): boolean {
@@ -27,6 +34,23 @@ class Zone {
 
   getSize(): number {
     return this.endAngle - this.startAngle
+  }
+
+  update(deltaTime: number): boolean {
+    this.age += deltaTime
+    const lifeRatio = 1 - (this.age / this.maxAge)
+    
+    if (lifeRatio <= 0) {
+      this.active = false
+      return false
+    }
+    
+    const currentSize = this.initialSize * Math.max(0.3, lifeRatio)
+    const midAngle = (this.startAngle + this.endAngle) / 2
+    this.startAngle = midAngle - currentSize / 2
+    this.endAngle = midAngle + currentSize / 2
+    
+    return true
   }
 }
 
@@ -190,12 +214,12 @@ class Game {
     
     this.isAccelerating = false
     
-    this.baseSpeed = 0.0001 // Slow default rotation speed
-    this.maxSpeed = 0.001 // Much slower max speed
+    this.baseSpeed = 0.002 // Easy default rotation speed
+    this.maxSpeed = 0.015 // Challenging max speed
     this.accelerationRate = 0.0005
     this.friction = 0.99
-    this.minZoneSize = Math.PI / 8
-    this.maxZones = 4
+    this.minZoneSize = Math.PI / 4 // Larger zones (90 degrees)
+    this.maxZones = 5
     
     this.shakeIntensity = 0
     this.slowMotion = 1
@@ -274,20 +298,30 @@ class Game {
     this.onScoreUpdate(this.score, this.combo, this.timeRemaining)
   }
 
+  lastZoneSpawn: number = 0
+  zoneSpawnInterval: number = 1500
+
   generateZones() {
     this.zones = []
-    const numZones = Math.min(2 + Math.floor(this.score / 200), this.maxZones)
-    const includeBonus = Math.random() > 0.7 && this.score > 100
+    const numZones = 3
     
     for (let i = 0; i < numZones; i++) {
-      const zoneSize = Math.max(
-        this.minZoneSize * (1 - this.score / 2000),
-        Math.PI / 20
-      )
-      const startAngle = Math.random() * (Math.PI * 2 - zoneSize)
-      const isBonus = includeBonus && i === 0
-      this.zones.push(new Zone(startAngle, startAngle + zoneSize, isBonus))
+      this.spawnZone()
     }
+    
+    this.lastZoneSpawn = Date.now()
+  }
+
+  spawnZone() {
+    if (this.zones.filter(z => z.active).length >= this.maxZones) return
+    
+    const zoneSize = Math.max(
+      this.minZoneSize * (1 - this.score / 3000),
+      Math.PI / 12
+    )
+    const startAngle = Math.random() * (Math.PI * 2 - zoneSize)
+    const isBonus = Math.random() > 0.65
+    this.zones.push(new Zone(startAngle, startAngle + zoneSize, isBonus))
   }
 
   attemptPick() {
@@ -323,22 +357,17 @@ class Game {
         this.spawnParticles(15, '#fbbf24')
       }
       
-      // Increase difficulty - much slower progression (keep the absolute value increasing)
+      // Increase difficulty - slower progression
       const speedDirection = this.baseSpeed > 0 ? 1 : -1
-      this.baseSpeed = (Math.abs(this.baseSpeed) + 0.0003) * speedDirection
-      this.maxSpeed += 0.001
-      this.minZoneSize *= 0.99
-      
-      // Check if all zones cleared
-      if (this.zones.every(z => !z.active)) {
-        this.generateZones()
-      }
+      this.baseSpeed = (Math.abs(this.baseSpeed) + 0.0002) * speedDirection
+      this.maxSpeed = Math.min(this.maxSpeed + 0.0008, 0.025)
+      this.minZoneSize *= 0.985
       
       this.onScoreUpdate(this.score, this.combo, this.timeRemaining)
     } else {
       // Miss
       this.combo = 0
-      this.timeRemaining -= 2
+      this.timeRemaining -= 1
       this.shakeIntensity = 10
       this.audio.fail()
       this.onScoreUpdate(this.score, this.combo, this.timeRemaining)
@@ -391,10 +420,23 @@ class Game {
     // Update shake
     this.shakeIntensity *= 0.9
     
-    // Update zone glow
+    // Update zones - shrink over time and spawn new ones
     this.zones.forEach(zone => {
       zone.glowIntensity = Math.sin(Date.now() / 200) * 0.3 + 0.7
+      if (zone.active) {
+        zone.update(deltaTime)
+      }
     })
+    
+    // Remove inactive zones
+    this.zones = this.zones.filter(z => z.active)
+    
+    // Spawn new zones continuously
+    const now = Date.now()
+    if (now - this.lastZoneSpawn > this.zoneSpawnInterval) {
+      this.spawnZone()
+      this.lastZoneSpawn = now
+    }
     
     // Update timer (only in real time)
     this.timeRemaining -= deltaTime / 1000
